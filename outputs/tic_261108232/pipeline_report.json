@@ -1,0 +1,48 @@
+{
+    "tic_id": "261108232",
+    "classification": {
+        "class_idx": 0,
+        "class_name": "Exoplanet Transit",
+        "confidence": 0.4373101592063904,
+        "probabilities": {
+            "Exoplanet Transit": 0.4373101592063904,
+            "Eclipsing Binary": 0.21551060676574707,
+            "Stellar Blend": 0.21930478513240814,
+            "Detector Artifact": 0.12787452340126038
+        }
+    },
+    "transit_parameters": {
+        "period": 0.5259653104870776,
+        "t0": 1337.022524909311,
+        "depth": 0.003794419991955289,
+        "duration": 0.02,
+        "rp_rs": 0.06159886356058275,
+        "a_rs": 8.37099790588819,
+        "inc": 90.0,
+        "impact_parameter": 0.0,
+        "uncertainties": {}
+    },
+    "scientific_validation": {
+        "snr": 0.0,
+        "reliability_score": 35.0,
+        "odd_even_test": {
+            "stat": 1.8816175271525284,
+            "p_value": 0.06782857220111667,
+            "odd_depth": NaN,
+            "even_depth": NaN,
+            "significant_difference": false
+        },
+        "centroid_test": {
+            "col_shift": 0.000171661376953125,
+            "row_shift": 0.00048065185546875,
+            "p_value_col": 0.6621790528297424,
+            "p_value_row": 0.4576529860496521,
+            "shift_detected": false
+        },
+        "significance_test": {
+            "f_statistic": 0.0,
+            "p_value": 1.0,
+            "ssr_reduction": 0.0
+        }
+    }
+}

@@ -1,0 +1,35 @@
+# Global Configuration for Exoplanet Detection Pipeline
+
+data:
+  cache_dir: "./data/cache"
+  synthetic_dir: "./data/synthetic"
+  output_dir: "./outputs"
+  model_dir: "./models"
+
+detrending:
+  sigma_upper: 3.0
+  sigma_lower: 3.0
+  savgol_window: 15
+  savgol_polyorder: 2
+  wotan_window_length: 0.5  # in days
+  wotan_method: "biweight"
+
+transit_search:
+  min_period: 0.5  # in days
+  max_period: 15.0  # in days
+  oversample: 2.0
+  duration_grid_steps: 10
+
+folding:
+  global_bins: 200
+  local_bins: 80
+  local_phase_width: 0.1  # fraction of phase centered at transit (e.g. -0.05 to +0.05)
+
+models:
+  cnn_epochs: 15
+  cnn_lr: 0.001
+  cnn_batch_size: 32
+  random_state: 42
+
+fitting:
+  bootstrap_iterations: 50
