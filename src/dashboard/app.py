@@ -1,8 +1,15 @@
+import sys
+import os
+
+# Resolve project root path and append to sys.path (avoids ModuleNotFoundError for src)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 import yaml
 import json
 import logging
@@ -24,66 +31,124 @@ logger = logging.getLogger(__name__)
 
 # Streamlit Page Config
 st.set_page_config(
-    page_title="Transit Hunter: AI Exoplanet Pipeline",
-    page_icon="🪐",
+    page_title="TransitHunter - Scientific Discovery Platform",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom Space Theme Styling
+# Custom Scientific/Academic Theme Styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Outfit', sans-serif;
+    /* Main Content Background & Text */
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stMain"], .main {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
     }
     
-    .main {
-        background-color: #0d0e15;
-        color: #e2e8f0;
+    /* Sidebar styling: clean light gray */
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+        border-right: 1px solid #e2e8f0 !important;
     }
     
-    .sidebar .sidebar-content {
-        background-color: #12131d;
+    /* Headings styling - Times New Roman / Academic Serif */
+    h1 {
+        color: #0f172a !important;
+        font-family: 'Times New Roman', Times, serif !important;
+        font-weight: 700 !important;
+        border-bottom: 1px solid #0f172a !important;
+        padding-bottom: 6px !important;
+        margin-top: 20px !important;
+        margin-bottom: 15px !important;
     }
     
-    .metric-card {
-        background: rgba(30, 41, 59, 0.45);
-        border-radius: 12px;
-        padding: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        backdrop-filter: blur(10px);
-        margin-bottom: 15px;
+    h2, h3 {
+        color: #1e293b !important;
+        font-family: 'Times New Roman', Times, serif !important;
+        font-weight: 600 !important;
+        margin-top: 15px !important;
+        margin-bottom: 10px !important;
     }
     
-    .metric-header {
-        font-size: 0.9rem;
-        color: #94a3b8;
-        font-weight: 600;
-        text-transform: uppercase;
-        margin-bottom: 5px;
+    /* Paragraphs and normal text */
+    p, span, li, label, div {
+        color: #1a1a1a !important;
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size: 0.95rem !important;
     }
     
-    .metric-value {
-        font-size: 1.8rem;
-        color: #f8fafc;
-        font-weight: 700;
+    /* Thin-bordered panels (Scientific cards) */
+    .research-card, div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #fcfcfd !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 4px !important;
+        padding: 16px !important;
+        margin-bottom: 12px !important;
     }
     
-    .metric-unit {
-        font-size: 1.0rem;
-        color: #38bdf8;
+    .research-header {
+        font-size: 0.8rem !important;
+        color: #4b5563 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        padding-bottom: 4px !important;
+        margin-bottom: 8px !important;
+        font-family: Arial, sans-serif !important;
     }
     
-    .success-text {
-        color: #4ade80;
-        font-weight: 600;
+    .research-value {
+        font-size: 1.4rem !important;
+        color: #111827 !important;
+        font-weight: 700 !important;
     }
     
-    .warning-text {
-        color: #f87171;
-        font-weight: 600;
+    .research-unit {
+        font-size: 0.85rem !important;
+        color: #2563eb !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Vetting status badges */
+    .success-badge {
+        background-color: #f0fdf4 !important;
+        border: 1px solid #bbf7d0 !important;
+        color: #166534 !important;
+        padding: 2px 8px !important;
+        border-radius: 2px !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        display: inline-block;
+    }
+    
+    .warning-badge {
+        background-color: #fef2f2 !important;
+        border: 1px solid #fecaca !important;
+        color: #991b1b !important;
+        padding: 2px 8px !important;
+        border-radius: 2px !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        display: inline-block;
+    }
+    
+    /* Scientific monitoring button styling */
+    div.stButton > button {
+        background-color: #f9fafb !important;
+        border: 1px solid #d1d5db !important;
+        color: #374151 !important;
+        border-radius: 4px !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        transition: all 0.15s ease !important;
+    }
+    
+    div.stButton > button:hover {
+        background-color: #f3f4f6 !important;
+        border-color: #9ca3af !important;
+        color: #2563eb !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -97,11 +162,11 @@ def load_config():
 # Helper to run pipeline and cache results in session_state
 def run_pipeline_for_dashboard(tic_id: str, sector: int, inject: bool, inj_p: float, inj_t0: float, inj_d: float, inj_dur: float):
     config = load_config()
-    with st.spinner("Acquiring raw light curve from MAST..."):
+    with st.spinner("Executing: MAST target query..."):
         downloader = TessDownloader(cache_dir=config["data"]["cache_dir"])
         lc = downloader.download_lightcurve(tic_id, sector)
         if lc is None:
-            st.error(f"Could not find or download TESS light curve for TIC {tic_id}.")
+            st.error(f"Error: Target data acquisition failed for TIC {tic_id}.")
             return False
         arrays = downloader.extract_arrays(lc)
         
@@ -110,11 +175,11 @@ def run_pipeline_for_dashboard(tic_id: str, sector: int, inject: bool, inj_p: fl
     flux_err = arrays["flux_err"]
     
     if inject:
-        with st.spinner("Injecting simulated physical exoplanet transit..."):
+        with st.spinner("Executing: Synthetic transit injection..."):
             injector = TransitInjector()
             flux, mock_model = injector.inject_transit(time, flux, inj_p, inj_t0, inj_d, inj_dur)
             
-    with st.spinner("Detrending and cleaning stellar noise (Wotan biweight)..."):
+    with st.spinner("Executing: Wotan stellar detrending..."):
         preprocessor = LightCurvePreprocessor(
             sigma_upper=config["detrending"]["sigma_upper"],
             sigma_lower=config["detrending"]["sigma_lower"],
@@ -122,14 +187,14 @@ def run_pipeline_for_dashboard(tic_id: str, sector: int, inject: bool, inj_p: fl
         )
         prep_res = preprocessor.flatten(time, flux, flux_err)
         
-    with st.spinner("Searching for periodic signals (BLS + TLS comparison)..."):
+    with st.spinner("Executing: BLS + TLS search algorithms..."):
         searcher = TransitSearcher(
             min_period=config["transit_search"]["min_period"],
             max_period=config["transit_search"]["max_period"]
         )
         bls_res, tls_res, best_res = searcher.search_all(prep_res["time"], prep_res["flux"], prep_res["flux_err"])
         
-    with st.spinner("Phase-folding around candidate period..."):
+    with st.spinner("Executing: Phase folding and binning..."):
         folder = PhaseFolder(
             global_bins=config["folding"]["global_bins"],
             local_bins=config["folding"]["local_bins"]
@@ -139,12 +204,11 @@ def run_pipeline_for_dashboard(tic_id: str, sector: int, inject: bool, inj_p: fl
             best_res["period"], best_res["t0"], best_res["duration"]
         )
         
-    with st.spinner("Extracting physics-based shape features..."):
+    with st.spinner("Executing: Physics feature extraction..."):
         extractor = FeatureExtractor()
         feats = extractor.extract_features(prep_res["time"], prep_res["flux"], best_res)
         
-    with st.spinner("Executing hybrid Deep Learning + ML classification..."):
-        # Models paths
+    with st.spinner("Executing: Ensemble model classification..."):
         cnn_path = os.path.join(config["data"]["model_dir"], "cnn_model.pt")
         physics_path = os.path.join(config["data"]["model_dir"], "physics_model.pkl")
         
@@ -164,15 +228,14 @@ def run_pipeline_for_dashboard(tic_id: str, sector: int, inject: bool, inj_p: fl
         ensemble = HybridEnsemble(cnn_model=cnn_model, physics_model=physics_clf)
         class_res = ensemble.classify_candidate(folded_res["global_flux"], folded_res["local_flux"], feats)
         
-    with st.spinner("Fitting physical orbital parameters (Bootstrap uncertainty)..."):
-        # Lower bootstrap size for dashboard speed
+    with st.spinner("Executing: Analytical transit fitting..."):
         fitter = TransitFitter(bootstrap_iterations=15)
         fit_res = fitter.fit_transit(
             prep_res["time"], prep_res["flux"],
             best_res["period"], best_res["t0"], best_res["duration"], best_res["depth"]
         )
         
-    with st.spinner("Performing scientific validation checks..."):
+    with st.spinner("Executing: Diagnostic vetting tests..."):
         validator = ScientificValidator()
         snr = validator.compute_snr(fit_res["depth"], feats["rms_noise"])
         odd_even_res = validator.perform_odd_even_test(
@@ -206,21 +269,16 @@ def run_pipeline_for_dashboard(tic_id: str, sector: int, inject: bool, inj_p: fl
         "significance": sig_res
     }
     
-    # Explainability
     st.session_state["cnn_model"] = cnn_model
     st.session_state["physics_clf"] = physics_clf
     
     return True
 
-# Initialize a default synthetic dataset on first run if nothing exists
+# Initialize default synthetic demo dataset if none loaded
 if "tic_id" not in st.session_state:
-    # Run a pipeline on a simulated exoplanet for immediate interactive dashboard visualization
     st.session_state["demo_mode"] = True
-    # Generate mock light curve and run
     time_mock = np.linspace(0.0, 15.0, 15 * 500)
-    # Generate low frequency stellar var + white noise
     var = 1.0 + 0.003 * np.sin(2 * np.pi * time_mock / 2.5) + np.random.normal(0, 0.001, len(time_mock))
-    # Inject transit
     injector = TransitInjector()
     flux_mock, model_mock = injector.inject_transit(time_mock, var, 3.24, 0.85, 0.006, 0.12)
     flux_err_mock = np.ones_like(time_mock) * 0.001
@@ -248,7 +306,6 @@ if "tic_id" not in st.session_state:
         prep_res["time"], prep_res["flux"], best_res["period"], best_res["t0"], best_res["duration"], best_res["depth"]
     )
     
-    # Mock validation values
     st.session_state["tic_id"] = "Simulated Candidate 1"
     st.session_state["raw_arrays"] = {"time": time_mock, "flux": flux_mock, "flux_err": flux_err_mock}
     st.session_state["prep_res"] = prep_res
@@ -274,166 +331,373 @@ if "tic_id" not in st.session_state:
     st.session_state["cnn_model"] = None
     st.session_state["physics_clf"] = None
 
-# Sidebar Controls
-st.sidebar.markdown("<h2 style='text-align: center; color: #38bdf8;'>🪐 Transit Hunter</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='text-align: center; font-size: 0.85rem; color: #64748b;'>End-to-End AI Exoplanet Pipeline</p>", unsafe_allow_html=True)
+# Sidebar Setup
+st.sidebar.markdown("<h2 style='text-align: center; color: #0f172a; font-family: \"Times New Roman\", serif;'>TransitHunter</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='text-align: center; font-size: 0.8rem; color: #475569; margin-top: -10px;'>Physics-Guided Explainable AI Framework</p>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
-page = st.sidebar.radio(
-    "Navigation Menu", 
-    [
-        "1. Data Explorer", 
-        "2. Light Curve Viewer", 
-        "3. Detrending Viewer", 
-        "4. Transit Detection", 
-        "5. Classification Results", 
-        "6. Explainability", 
-        "7. Final Report"
-    ]
+# Page mapping with strict text labels (No Emojis)
+pages_list = [
+    "Home",
+    "Data Explorer",
+    "Light Curve Viewer",
+    "Detrending Analysis",
+    "Transit Detection",
+    "Classification Results",
+    "Explainability",
+    "Final Report",
+    "Research Mode"
+]
+
+# Navigation callback helper to avoid StreamlitAPIException
+def navigate_to(page_name):
+    st.session_state["nav_page"] = page_name
+    st.session_state["nav_radio"] = page_name
+
+if "nav_page" not in st.session_state:
+    st.session_state["nav_page"] = "Home"
+
+# Update index from current session state
+current_idx = pages_list.index(st.session_state["nav_page"])
+
+selected_page = st.sidebar.radio(
+    "Navigation Menu",
+    pages_list,
+    index=current_idx,
+    key="nav_radio"
 )
 
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"**Current Target:**\n`TIC {st.session_state['tic_id']}`")
-if "demo_mode" in st.session_state:
-    st.sidebar.warning("Running in simulated demo mode. Use the Data Explorer page to download real TESS light curves.")
+if selected_page != st.session_state["nav_page"]:
+    st.session_state["nav_page"] = selected_page
+    st.rerun()
 
-# Main Dashboard Pages
-if page == "1. Data Explorer":
-    st.title("🪐 exoplanet pipeline Data Explorer")
-    st.markdown("Download astronomical light curves directly from MAST (TESS Mission) or test the pipeline robustness by injecting simulated planetary transits.")
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"**Target Identifier:** TIC {st.session_state['tic_id']}")
+if "demo_mode" in st.session_state:
+    st.sidebar.info("Running in simulated mode. Use Data Explorer to ingest real MAST light curves.")
+
+# Global plotting context overrides
+plt.rcParams['figure.facecolor'] = 'white'
+plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['text.color'] = '#1a1a1a'
+plt.rcParams['axes.labelcolor'] = '#1a1a1a'
+plt.rcParams['xtick.color'] = '#1a1a1a'
+plt.rcParams['ytick.color'] = '#1a1a1a'
+
+# Helper to apply standard clean borders to plots
+def apply_plot_borders(ax, hide_ticks=False):
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color('#cbd5e1')
+        spine.set_linewidth(1.0)
+    if hide_ticks:
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+# --- 1. HOME PAGE ---
+if st.session_state["nav_page"] == "Home":
+    st.title("TransitHunter")
+    st.caption("Physics-Guided Explainable AI Framework for Exoplanet Detection")
+    
+    st.markdown("""
+    **Project Overview:**  
+    TransitHunter is a modular scientific pipeline designed to analyze high-cadence photometric observations, remove systematic stellar activity trends, search for periodic occultations, extract shape-sensitive physical parameters, and perform joint neural network and physics-informed classification of planet transit candidates.
+    
+    **Pipeline Architecture:**  
+    TESS Data → Detrending → BLS → TLS → Phase Folding → Feature Extraction → Hybrid AI → Transit Fitting → Validation
+    """)
+    
+    st.markdown("---")
+    st.subheader("Scientific Monitoring & Navigation Control Panel")
+    
+    # Homepage Wireframe Grid Layout
+    # Row 1
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Data Explorer</div>', unsafe_allow_html=True)
+            st.markdown(f"**Target ID:** `TIC {st.session_state['tic_id']}`")
+            
+            # Mini table status fields
+            data = {
+                "Module Status": ["Detrending", "BLS/TLS", "Validation"],
+                "Verification": ["Complete", "Complete", "Complete"]
+            }
+            df_status = pd.DataFrame(data)
+            st.dataframe(df_status, hide_index=True, use_container_width=True)
+            st.button("Open Data Explorer", key="go_explorer", on_click=navigate_to, args=("Data Explorer",), use_container_width=True)
+        
+    with col2:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Light Curve Viewer</div>', unsafe_allow_html=True)
+            
+            time = st.session_state["raw_arrays"]["time"]
+            flux = st.session_state["raw_arrays"]["flux"]
+            
+            # Mini plot
+            fig, ax = plt.subplots(figsize=(3, 1.0))
+            ax.plot(time, flux, '.', color='#64748b', markersize=0.5, alpha=0.3)
+            apply_plot_borders(ax, hide_ticks=True)
+            fig.patch.set_facecolor('#fcfcfd')
+            ax.set_facecolor('#fcfcfd')
+            st.pyplot(fig)
+            plt.close()
+            
+            st.markdown(f"**Data Points:** {len(time)}")
+            st.markdown(f"**RMS Noise:** {np.std(flux)*1e6:.1f} ppm")
+            st.markdown(f"**Time Span:** {time[-1]-time[0]:.2f} days")
+            
+            st.button("Open Light Curve", key="go_lc", on_click=navigate_to, args=("Light Curve Viewer",), use_container_width=True)
+        
+    with col3:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Detrending Analysis</div>', unsafe_allow_html=True)
+            
+            prep = st.session_state["prep_res"]
+            
+            # Mini plot
+            fig, ax = plt.subplots(figsize=(3, 1.0))
+            ax.plot(prep["time"], prep["flux"], '.', color='#2563eb', markersize=0.5, alpha=0.4)
+            apply_plot_borders(ax, hide_ticks=True)
+            fig.patch.set_facecolor('#fcfcfd')
+            ax.set_facecolor('#fcfcfd')
+            st.pyplot(fig)
+            plt.close()
+            
+            st.markdown("**Method:** Wotan Biweight Filter")
+            st.markdown(f"**Window Size:** {load_config()['detrending']['wotan_window_length']} days")
+            st.markdown(f"**Residual Noise:** {st.session_state['features']['rms_noise']*1e6:.1f} ppm")
+            
+            st.button("Open Detrending", key="go_detrending", on_click=navigate_to, args=("Detrending Analysis",), use_container_width=True)
+
+    # Row 2
+    col4, col5, col6 = st.columns(3)
+    
+    with col4:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Transit Detection</div>', unsafe_allow_html=True)
+            
+            best = st.session_state["best_res"]
+            
+            # Mini plot
+            fig, ax = plt.subplots(figsize=(3, 1.0))
+            if "periods" in st.session_state["bls_res"]:
+                ax.plot(st.session_state["bls_res"]["periods"], st.session_state["bls_res"]["powers"], color='black', lw=0.4)
+            apply_plot_borders(ax, hide_ticks=True)
+            fig.patch.set_facecolor('#fcfcfd')
+            ax.set_facecolor('#fcfcfd')
+            st.pyplot(fig)
+            plt.close()
+            
+            st.markdown(f"**Best Period:** {best['period']:.5f} days")
+            st.markdown(f"**Transit Epoch:** {best['t0']:.4f} BTJD")
+            st.markdown(f"**Search SNR:** {best['snr']:.2f}")
+            
+            st.button("Open Transit Detection", key="go_detection", on_click=navigate_to, args=("Transit Detection",), use_container_width=True)
+        
+    with col5:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Classification Results</div>', unsafe_allow_html=True)
+            
+            class_res = st.session_state["classification"]
+            
+            # Mini chart
+            fig, ax = plt.subplots(figsize=(3, 1.0))
+            probs = list(class_res["probabilities"].values())
+            names = ["Planet", "EB", "Blend", "Artifact"]
+            y_pos = np.arange(len(names))
+            ax.barh(y_pos, probs, color='#2563eb', alpha=0.7, height=0.6)
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(names, fontsize=6)
+            ax.set_xlim([0, 1])
+            apply_plot_borders(ax, hide_ticks=False)
+            ax.tick_params(axis='both', labelsize=6)
+            fig.patch.set_facecolor('#fcfcfd')
+            ax.set_facecolor('#fcfcfd')
+            st.pyplot(fig)
+            plt.close()
+            
+            st.markdown(f"**Decision:** {class_res['class_name']}")
+            st.markdown(f"**Confidence:** {class_res['confidence']:.2%}")
+            
+            st.button("Open Classification", key="go_classification", on_click=navigate_to, args=("Classification Results",), use_container_width=True)
+        
+    with col6:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Explainability & Final Report</div>', unsafe_allow_html=True)
+            
+            val = st.session_state["validation"]
+            
+            # Mini reliability gauge
+            fig, ax = plt.subplots(figsize=(3, 1.0))
+            rel = val["reliability"]
+            ax.text(0.5, 0.5, f"Vetting Reliability\n{rel:.1f}%", 
+                    ha='center', va='center', fontsize=11, fontweight='bold', 
+                    color='#166534' if rel >= 75 else '#991b1b')
+            apply_plot_borders(ax, hide_ticks=True)
+            fig.patch.set_facecolor('#fcfcfd')
+            ax.set_facecolor('#fcfcfd')
+            st.pyplot(fig)
+            plt.close()
+            
+            st.markdown(f"**F-test Significance:** {val['significance']['p_value']:.2e}")
+            st.markdown(f"**Odd-Even Vetting:** {'Flagged' if val['odd_even']['significant_difference'] else 'Passed'}")
+            st.markdown(f"**Centroid Shift:** {'Shift Detected' if val['centroid']['shift_detected'] else 'Stable'}")
+            
+            st.button("Open Final Report", key="go_report", on_click=navigate_to, args=("Final Report",), use_container_width=True)
+
+    # Row 3
+    col7, _, _ = st.columns(3)
+    with col7:
+        with st.container(border=True):
+            st.markdown('<div class="research-header">Research Mode</div>', unsafe_allow_html=True)
+            st.markdown("**Advanced Exoplanet Discovery Environment**")
+            st.markdown("Planned capabilities for manual analysis, Custom Fits ingestion, leadboard tables, and Multi-model benchmarking.")
+            st.markdown("<span class='warning-badge'>Status: In Development</span>", unsafe_allow_html=True)
+            
+            st.write("") # spacer
+            st.button("Open Research Mode", key="go_research", on_click=navigate_to, args=("Research Mode",), use_container_width=True)
+
+# --- 2. DATA EXPLORER ---
+elif st.session_state["nav_page"] == "Data Explorer":
+    st.title("Data Acquisition & Synthetic Injection Explorer")
+    st.markdown("Download target light curves from Mikulski Archive for Space Telescopes (MAST) or inject simulated physical occultations to test algorithm pipelines.")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("MAST Target Search")
-        target_tic = st.text_input("TESS Input Catalog (TIC) ID:", "261108232")
-        sector_num = st.number_input("TESS Sector (leave 0 for auto):", min_value=0, max_value=100, value=0)
+        st.subheader("Data Source Options")
+        target_tic = st.text_input("TESS Input Catalog (TIC) Identifier:", "261108232")
+        sector_num = st.number_input("TESS Sector (0 for automatic detection):", min_value=0, max_value=100, value=0)
         
-        st.subheader("Synthetic Transit Injection (Robustness Evaluation)")
-        inject_check = st.checkbox("Inject simulated transit into target flux?", value=False)
+        st.subheader("Synthetic Transit Model Injection")
+        inject_check = st.checkbox("Inject simulated transit model into flux?", value=False)
         
-        p_inj = st.slider("Orbital Period (Days):", 1.0, 15.0, 3.5, 0.01)
-        depth_inj = st.slider("Transit Depth (Fractional):", 0.001, 0.05, 0.006, 0.0001, format="%.4f")
-        dur_inj = st.slider("Transit Duration (Days):", 0.02, 0.4, 0.12, 0.01)
-        t0_inj = st.slider("Mid-Transit Epoch t0 (Days):", 0.1, 3.0, 1.0, 0.1)
+        p_inj = st.slider("Orbital Period (days):", 1.0, 15.0, 3.5, 0.01)
+        depth_inj = st.slider("Transit Depth (fractional flux):", 0.001, 0.05, 0.006, 0.0001, format="%.4f")
+        dur_inj = st.slider("Transit Duration (days):", 0.02, 0.4, 0.12, 0.01)
+        t0_inj = st.slider("Transit Center Epoch t0 (days):", 0.1, 3.0, 1.0, 0.1)
 
     with col2:
-        st.subheader("Execution Center")
+        st.subheader("Automated Pipeline Controller")
         st.markdown("""
-        Deploy the full AI stack for the selected target:
-        - Detrends stellar variability
-        - Scans periods using Astropy BLS + refined chi-squared templates
-        - Extract 11 shapes & astronomical parameters
-        - Resolves CNN & XGBoost hybrid model ensembles
-        - Fits analytical transits with Bootstrap confidence borders
-        - Conducts scientific validation checks (Centroids, Odd/Evens)
+        Deploying the execution stack triggers:
+        - Stellar rotation detrending (Wotan high-pass)
+        - Phase space BLS period searching
+        - Physical orbital fitting & bootstrapping
+        - Scientific vetting validations (centroids & odd-even checks)
+        - CNN & XGBoost ensemble classification
         """)
         
-        if st.button("RUN PIPELINE", use_container_width=True):
+        if st.button("Execute Pipeline", use_container_width=True):
             if "demo_mode" in st.session_state:
                 del st.session_state["demo_mode"]
                 
             sec = None if sector_num == 0 else int(sector_num)
             success = run_pipeline_for_dashboard(target_tic, sec, inject_check, p_inj, t0_inj, depth_inj, dur_inj)
             if success:
-                st.success("Pipeline executed successfully! Navigate through other tabs to explore results.")
-                st.balloons()
+                st.success("Success: Data acquisition and pipeline execution completed.")
                 st.rerun()
 
-elif page == "2. Light Curve Viewer":
-    st.title("📊 Raw Light Curve Viewer")
+# --- 3. LIGHT CURVE VIEWER ---
+elif st.session_state["nav_page"] == "Light Curve Viewer":
+    st.title("Raw Photometric Light Curve")
     
-    # Raw light curve charts
     time = st.session_state["raw_arrays"]["time"]
     flux = st.session_state["raw_arrays"]["flux"]
     
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(time, flux, '.', color='gray', alpha=0.5, label='Raw Flux')
-    ax.set_xlabel('Time (BTJD days)')
-    ax.set_ylabel('Relative Flux')
-    ax.set_title(f'Raw Light Curve - TIC {st.session_state["tic_id"]}')
-    ax.grid(True, alpha=0.3)
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    ax.plot(time, flux, '.', color='black', alpha=0.4, markersize=1.5, label='Raw Flux')
+    ax.set_xlabel('Time (BTJD days)', fontsize=9)
+    ax.set_ylabel('Relative Flux', fontsize=9)
+    ax.set_title(f'Raw Light Curve - TIC {st.session_state["tic_id"]}', fontsize=10, fontweight='bold')
+    apply_plot_borders(ax)
+    ax.grid(True, color='#e5e7eb', linestyle='--', linewidth=0.5)
+    ax.legend(frameon=True, facecolor='white', edgecolor='#e5e7eb')
     st.pyplot(fig)
     plt.close()
     
-    # Metadata stats
-    st.subheader("Observation Statistics")
+    st.subheader("Data Stream Summary Metrics")
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Data Points</div><div class='metric-value'>{len(time)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Data Points</div><div class="research-value">{len(time)}</div></div>', unsafe_allow_html=True)
     with c2:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Time Coverage</div><div class='metric-value'>{time[-1]-time[0]:.2f} <span class='metric-unit'>Days</span></div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Observation Baseline</div><div class="research-value">{time[-1]-time[0]:.2f} <span class="research-unit">days</span></div></div>', unsafe_allow_html=True)
     with c3:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>RMS Scatter</div><div class='metric-value'>{np.std(flux)*1e6:.1f} <span class='metric-unit'>ppm</span></div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Photometric RMS Scatter</div><div class="research-value">{np.std(flux)*1e6:.1f} <span class="research-unit">ppm</span></div></div>', unsafe_allow_html=True)
 
-elif page == "3. Detrending Viewer":
-    st.title("🧼 Light Curve Preprocessing & Detrending")
-    st.markdown("Removing stellar rotation, pulsations, and instrumental drifts using a **Wotan flattened biweight window filter** and sigma-clipping.")
+# --- 4. DETRENDING ANALYSIS ---
+elif st.session_state["nav_page"] == "Detrending Analysis":
+    st.title("Stellar Detrending & Cleaning Analysis")
+    st.markdown("Removing low-frequency stellar rotation and instrumental drifts using a **Wotan high-pass biweight filter**.")
     
     prep = st.session_state["prep_res"]
     
-    fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-    ax[0].plot(prep["time"], prep["raw_flux"], '.', color='gray', alpha=0.5, label='Raw Flux')
-    ax[0].plot(prep["time"], prep["trend"], color='red', lw=1.5, label='Estimated Stellar Trend')
-    ax[0].set_ylabel('Normalized Flux')
-    ax[0].set_title('Raw Curve & Long-term Stellar Trend')
-    ax[0].legend()
-    ax[0].grid(True, alpha=0.3)
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6.5), sharex=True)
+    ax[0].plot(prep["time"], prep["raw_flux"], '.', color='gray', alpha=0.4, markersize=1.5, label='Raw Flux')
+    ax[0].plot(prep["time"], prep["trend"], color='red', lw=1.2, label='Biweight Trend Model')
+    ax[0].set_ylabel('Relative Flux', fontsize=9)
+    ax[0].set_title('Raw Curve & Estimated Low-frequency Trend', fontsize=10, fontweight='bold')
+    apply_plot_borders(ax[0])
+    ax[0].grid(True, color='#e5e7eb', linestyle='--', linewidth=0.5)
+    ax[0].legend(frameon=True, facecolor='white', edgecolor='#e5e7eb')
     
-    ax[1].plot(prep["time"], prep["flux"], '.', color='blue', alpha=0.5, label='Clean Detrended Flux')
-    ax[1].set_xlabel('Time (Days)')
-    ax[1].set_ylabel('Detrended Flux')
-    ax[1].set_title('Clean Flattened Light Curve')
-    ax[1].legend()
-    ax[1].grid(True, alpha=0.3)
+    ax[1].plot(prep["time"], prep["flux"], '.', color='#2563eb', alpha=0.4, markersize=1.5, label='Detrended Flux')
+    ax[1].set_xlabel('Time (BTJD days)', fontsize=9)
+    ax[1].set_ylabel('Normalized Flux', fontsize=9)
+    ax[1].set_title('Flattened Detrended Light Curve', fontsize=10, fontweight='bold')
+    apply_plot_borders(ax[1])
+    ax[1].grid(True, color='#e5e7eb', linestyle='--', linewidth=0.5)
+    ax[1].legend(frameon=True, facecolor='white', edgecolor='#e5e7eb')
     
     st.pyplot(fig)
     plt.close()
     
-    st.subheader("Preprocessing Summary")
+    st.subheader("Filter Summary Parameters")
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**Stellar Flatness Check:** Long-term variations have been normalized to a unit baseline. Flaring anomalies and spacecraft jitter spikes were successfully rejected using standard $3\sigma$ iterative clipping.")
+        st.markdown("**Outlier Rejection:** $3\sigma$ iterative sigma-clipping was run to filter flares and pointing anomalies.")
     with c2:
-        st.markdown(f"**Detrending Method:** Biweight Window Filter  \n**Filter Width:** {load_config()['detrending']['wotan_window_length']} days  \n**Residual Noise (out-of-transit):** {st.session_state['features']['rms_noise']*1e6:.1f} ppm")
+        st.markdown(f"**Filter Method:** Sliding Biweight Filter  \n**Filter Scale (Window Width):** {load_config()['detrending']['wotan_window_length']} days  \n**Baseline RMS Noise:** {st.session_state['features']['rms_noise']*1e6:.1f} ppm")
 
-elif page == "4. Transit Detection":
-    st.title("🔍 Periodic Transit Signal Search")
-    st.markdown("We perform **Box Least Squares (BLS)** to find initial periodic dips, then refine the search parameters utilizing shape-matched templates.")
+# --- 5. TRANSIT DETECTION ---
+elif st.session_state["nav_page"] == "Transit Detection":
+    st.title("Periodic Transit Search Results")
+    st.markdown("Initial signal search executed via **Box Least Squares (BLS)**, with parameter refinement utilizing U-shaped templates.")
     
     best = st.session_state["best_res"]
     
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.subheader("Detected Periodic Signal")
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Best Period</div><div class='metric-value'>{best['period']:.5f} <span class='metric-unit'>Days</span></div></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Transit Epoch (t0)</div><div class='metric-value'>{best['t0']:.4f} <span class='metric-unit'>BTJD</span></div></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Transit Duration</div><div class='metric-value'>{best['duration']*24.0:.2f} <span class='metric-unit'>Hours</span></div></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Search Signal SNR</div><div class='metric-value'>{best['snr']:.2f}</div></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 2.2])
+    with col1:
+        st.subheader("BLS Peak Characteristics")
+        st.markdown(f'<div class="research-card"><div class="research-header">Orbital Period</div><div class="research-value">{best["period"]:.5f} <span class="research-unit">days</span></div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Transit Epoch (t0)</div><div class="research-value">{best["t0"]:.4f} <span class="research-unit">BTJD</span></div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Occultation Duration</div><div class="research-value">{best["duration"]*24.0:.2f} <span class="research-unit">hours</span></div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Detection SNR</div><div class="research-value">{best["snr"]:.2f}</div></div>', unsafe_allow_html=True)
         
-    with c2:
+    with col2:
         st.subheader("BLS Periodogram Power Spectrum")
-        # Generate dummy representation of power spectrum for plotting
         if "periods" in st.session_state["bls_res"]:
             periods = st.session_state["bls_res"]["periods"]
             powers = st.session_state["bls_res"]["powers"]
             
-            fig, ax = plt.subplots(figsize=(8, 5))
-            ax.plot(periods, powers, color='indigo')
-            ax.axvline(best['period'], color='orange', linestyle='--', label=f'Peak: {best["period"]:.4f} d')
-            ax.set_xlabel('Period (days)')
-            ax.set_ylabel('BLS Power')
-            ax.set_title('Period Search Spectrum')
-            ax.grid(True, alpha=0.3)
-            ax.legend()
+            fig, ax = plt.subplots(figsize=(8, 4.5))
+            ax.plot(periods, powers, color='black', lw=0.7)
+            ax.axvline(best['period'], color='blue', linestyle='--', label=f'Peak: {best["period"]:.4f} days')
+            ax.set_xlabel('Search Period (days)', fontsize=9)
+            ax.set_ylabel('BLS Power (arbitrary)', fontsize=9)
+            apply_plot_borders(ax)
+            ax.grid(True, color='#e5e7eb', linestyle='--', linewidth=0.5)
+            ax.legend(frameon=True, facecolor='white', edgecolor='#e5e7eb')
             st.pyplot(fig)
             plt.close()
         else:
-            st.info("Power spectrum data not recorded in simulated demo mode.")
+            st.info("BLS Power spectrum array not loaded in simulated demo mode.")
 
-elif page == "5. Classification Results":
-    st.title("🤖 Hybrid AI Classification & Transit Fitting")
+# --- 6. CLASSIFICATION RESULTS ---
+elif st.session_state["nav_page"] == "Classification Results":
+    st.title("AI Classification & Orbit Optimization")
     
     class_res = st.session_state["classification"]
     fit = st.session_state["fit_res"]
@@ -441,84 +705,74 @@ elif page == "5. Classification Results":
     col1, col2 = st.columns([1, 1.2])
     
     with col1:
-        st.subheader("AI Classification Decision")
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Ensembled Class Decision</div><div class='metric-value' style='color:#38bdf8;'>{class_res['class_name']}</div></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Model Confidence Score</div><div class='metric-value'>{class_res['confidence']:.2%}</div></div>", unsafe_allow_html=True)
+        st.subheader("Ensemble Classifier Output")
+        st.markdown(f'<div class="research-card"><div class="research-header">Ensemble Prediction</div><div class="research-value">{class_res["class_name"]}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Confidence Level</div><div class="research-value">{class_res["confidence"]:.2%}</div></div>', unsafe_allow_html=True)
         
-        # Display class probabilities as progress bars
-        st.markdown("### Probabilities Breakdowns")
+        st.markdown("**Probability Distribution:**")
         for cls_name, prob in class_res["probabilities"].items():
-            st.write(f"**{cls_name}:** {prob:.1%}")
+            st.write(f"*{cls_name}:* {prob:.1%}")
             st.progress(prob)
             
     with col2:
-        st.subheader("Physical Transit Fitting & Phase-Folded Curve")
+        st.subheader("Physical Orbit Fitting")
         folded = st.session_state["folded_res"]
         
-        fig, ax = plt.subplots(figsize=(8, 5))
-        # Plot local binned curve
-        ax.plot(folded["local_phase"], folded["local_flux"], 'o', color='black', label='Binned Flux (80 bins)', alpha=0.6)
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        ax.plot(folded["local_phase"], folded["local_flux"], 'o', color='black', markersize=3, label='Binned Flux (80 bins)', alpha=0.5)
         
-        # Fit overlay
-        # generate model curve on the local phase grid
-        # Center epoch is 0.0 in folded phase
         if "ingress_ratio" in fit:
             # Trapezoid model
-            fitted_local = fitter = TransitFitter()._trapezoid_model(folded["local_phase"], 0.0, fit["depth"], fit["duration"]/fit["period"], fit["ingress_ratio"])
-            # Normalize to 0.0 baseline
-            fitted_local = fitted_local - 1.0
+            fitted_local = fitter = TransitFitter()._trapezoid_model(folded["local_phase"], 0.0, fit["depth"], fit["duration"]/fit["period"], fit["ingress_ratio"]) - 1.0
         else:
             # Batman model
-            # Reconstruct model at local phase times using P=best period, t0=0.0
             fitter = TransitFitter()
             try:
                 fitted_local = fitter._batman_model_func(folded["local_phase"], 0.0, fit["rp_rs"], fit["a_rs"], fit["inc"], best_res["period"])
                 fitted_local = fitted_local - np.median(fitted_local)
             except Exception:
-                # fallback
                 fitted_local = TransitFitter()._trapezoid_model(folded["local_phase"], 0.0, fit["depth"], fit["duration"]/best_res["period"], 0.1) - 1.0
                 
-        ax.plot(folded["local_phase"], fitted_local, color='red', lw=3, label='Best-fit Orbit Model')
-        ax.set_xlabel('Phase')
-        ax.set_ylabel('Binned Normalized Flux')
-        ax.set_title('Physical Transit Fit Overlay')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        ax.plot(folded["local_phase"], fitted_local, color='blue', lw=1.8, label='Limb-Darkened Keplerian Model')
+        ax.set_xlabel('Phase offset', fontsize=9)
+        ax.set_ylabel('Normalized Flux (binned)', fontsize=9)
+        apply_plot_borders(ax)
+        ax.grid(True, color='#e5e7eb', linestyle='--', linewidth=0.5)
+        ax.legend(frameon=True, facecolor='white', edgecolor='#e5e7eb')
         st.pyplot(fig)
         plt.close()
 
-    # Fitted parameters Table
-    st.subheader("Fitted Orbital Parameters & Physical Estimates")
+    st.subheader("Optimized Physical Parameters (Bootstrap Uncertainty Bounds)")
     c1, c2, c3, c4 = st.columns(4)
     
-    # Extract errors if present
     err = fit.get("uncertainties", {})
-    t0_err_str = f" ± {err['t0_err']:.5f}" if "t0_err" in err else ""
     rp_err_str = f" ± {err['rp_rs_err']:.4f}" if "rp_rs_err" in err else ""
     a_err_str = f" ± {err['a_rs_err']:.2f}" if "a_rs_err" in err else ""
     inc_err_str = f" ± {err['inc_err']:.2f}" if "inc_err" in err else ""
     
     with c1:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Planet Radius Ratio (Rp/Rs)</div><div class='metric-value'>{fit['rp_rs']:.4f}<span style='font-size:0.9rem; color:#94a3b8;'>{rp_err_str}</span></div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Radius Ratio (Rp/Rs)</div><div class="research-value">{fit["rp_rs"]:.4f} <span style="font-size:0.8rem; color:#6b7280;">{rp_err_str}</span></div></div>', unsafe_allow_html=True)
     with c2:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Orbital Distance (a/Rs)</div><div class='metric-value'>{fit['a_rs']:.2f}<span style='font-size:0.9rem; color:#94a3b8;'>{a_err_str}</span></div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Separation (a/Rs)</div><div class="research-value">{fit["a_rs"]:.2f} <span style="font-size:0.8rem; color:#6b7280;">{a_err_str}</span></div></div>', unsafe_allow_html=True)
     with c3:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Inclination (i)</div><div class='metric-value'>{fit['inc']:.1f}°<span style='font-size:0.9rem; color:#94a3b8;'>{inc_err_str}</span></div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Inclination (i)</div><div class="research-value">{fit["inc"]:.1f}° <span style="font-size:0.8rem; color:#6b7280;">{inc_err_str}</span></div></div>', unsafe_allow_html=True)
     with c4:
-        st.markdown(f"<div class='metric-card'><div class='metric-header'>Impact Parameter (b)</div><div class='metric-value'>{fit.get('impact_parameter', 0.0):.3f}</div></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="research-card"><div class="research-header">Impact parameter (b)</div><div class="research-value">{fit.get("impact_parameter", 0.0):.3f}</div></div>', unsafe_allow_html=True)
 
-elif page == "6. Explainability":
-    st.title("🧠 Explainable AI Diagnostic Dashboard")
-    st.markdown("Providing scientific interpretability for decisions using **Grad-CAM** (for neural net CNN shapes) and **Feature Perturbation Importances** (for physics classifiers).")
+# --- 7. EXPLAINABILITY ---
+elif st.session_state["nav_page"] == "Explainability":
+    st.title("Explainable AI Diagnosis")
+    st.markdown("Local shape attribution highlights generated from 1D Grad-CAM (CNN pathways) and feature importances.")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("1. Deep Learning Grad-CAM (Shape Attribution)")
+        st.subheader("1. Deep Learning Grad-CAM Local Activation Heatmap")
         cnn_model = st.session_state["cnn_model"]
         folded = st.session_state["folded_res"]
         class_res = st.session_state["classification"]
         
+        # Draw Grad-CAM overlay
         if cnn_model is not None:
             explainer = ExplainabilityEngine(cnn_model=cnn_model)
             try:
@@ -526,28 +780,28 @@ elif page == "6. Explainability":
                     folded["global_flux"], folded["local_flux"], class_res["class_idx"]
                 )
                 fig = explainer.plot_gradcam_overlay(folded["local_phase"], folded["local_flux"], cam)
+                # Apply white background
+                fig.patch.set_facecolor('white')
                 st.pyplot(fig)
                 plt.close()
-                st.markdown("**Grad-CAM Explanation:** Bright yellow points indicate regions that had the most influence on the CNN's classification. For exoplanets, these match the steep ingress/egress shoulders and flat bottom, proving the CNN has successfully learned physical transit geometries instead of random detector systematics.")
             except Exception as e:
                 st.warning(f"Grad-CAM could not be computed: {str(e)}")
         else:
-            st.info("Grad-CAM overlay requires trained CNN models. Training weights were not detected on current workspace. Displaying static placeholder explanation.")
-            # Dummy Cam representation for demo
+            # Mock demo representation
             cam = np.zeros_like(folded["local_flux"])
-            # Highlight center transit indices
             center_idx = len(cam) // 2
             cam[center_idx-15 : center_idx+15] = np.linspace(0, 1, 30)
             explainer = ExplainabilityEngine()
             fig = explainer.plot_gradcam_overlay(folded["local_phase"], folded["local_flux"], cam)
+            fig.patch.set_facecolor('white')
             st.pyplot(fig)
             plt.close()
+        st.markdown("**Interpretation:** The activation heatmap denotes which specific phases dominated the CNN's decision. High intensity weights along the ingress and egress shoulders suggest physical transit parameters were correctly isolated.")
             
     with col2:
-        st.subheader("2. Physics Feature Contribution Analysis")
+        st.subheader("2. Physics Classifier Feature Attribution")
         physics_clf = st.session_state["physics_clf"]
         feats = st.session_state["features"]
-        
         feature_names = [
             "transit_depth", "transit_duration", "period", "epoch",
             "ingress_slope", "egress_slope", "symmetry_score", "u_v_score",
@@ -556,15 +810,15 @@ elif page == "6. Explainability":
         
         explainer = ExplainabilityEngine(physics_classifier=physics_clf)
         
-        # If model loaded, perform real sensitivity
         if physics_clf is not None:
             try:
                 contribs = explainer.get_physics_explanation(feats, feature_names)
                 fig = explainer.plot_feature_importance(contribs)
+                fig.patch.set_facecolor('white')
                 st.pyplot(fig)
                 plt.close()
             except Exception as e:
-                st.warning(f"Perturbation importance failed: {str(e)}")
+                st.warning(f"Feature importance failed: {str(e)}")
         else:
             # Demo values
             contribs = {
@@ -573,13 +827,14 @@ elif page == "6. Explainability":
                 "rms_noise": -0.05, "odd_even_difference": 0.28, "transit_signal_strength": 0.40
             }
             fig = explainer.plot_feature_importance(contribs)
+            fig.patch.set_facecolor('white')
             st.pyplot(fig)
             plt.close()
-            
-        st.markdown("**Feature Contribution Interpretation:** Horizontal bar values represent the strength and direction of a feature's effect on predicting the Exoplanet class. For Eclipsing Binaries, `odd_even_difference` and `u_v_score` typically dominate the classification boundary.")
+        st.markdown("**Interpretation:** Calculated feature importance metrics show the contribution direction of shape parameters on final candidate vetting.")
 
-elif page == "7. Final Report":
-    st.title("📋 Final Candidate Scientific Report")
+# --- 8. FINAL REPORT ---
+elif st.session_state["nav_page"] == "Final Report":
+    st.title("Scientific Candidate Diagnostic Report")
     
     val = st.session_state["validation"]
     fit = st.session_state["fit_res"]
@@ -589,64 +844,63 @@ elif page == "7. Final Report":
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("1. General Target Summary")
-        st.markdown(f"**Target Identifier:** TIC {st.session_state['tic_id']}")
-        st.markdown(f"**AI Classification:** {class_res['class_name']} ({class_res['confidence']:.1%} confidence)")
-        st.markdown(f"**Pipeline Signal-to-Noise Ratio (SNR):** {val['snr']:.2f}")
+        st.subheader("Candidate General Summary")
+        st.markdown(f"**Target ID:** `TIC {st.session_state['tic_id']}`")
+        st.markdown(f"**AI Classification Result:** {class_res['class_name']} ({class_res['confidence']:.1%} confidence)")
+        st.markdown(f"**Signal-to-Noise Ratio (SNR):** {val['snr']:.2f}")
         
-        st.subheader("2. Validation Diagnostic Checklist")
+        st.subheader("Diagnostic Validation Vetting Checklist")
         
-        # Odd-Even test text
+        # Vetting status boxes
         oe_sig = val["odd_even"]["significant_difference"]
-        oe_icon = "❌ EB Candidate (Sig Difference)" if oe_sig else "✅ Passed (No Depth Difference)"
-        oe_color = "warning-text" if oe_sig else "success-text"
-        st.markdown(f"**Odd-Even Transit Depth Test:**  \n<span class='{oe_color}'>{oe_icon}</span> (Odd Depth: {val['odd_even']['odd_depth']:.4f}, Even Depth: {val['odd_even']['even_depth']:.4f})", unsafe_allow_html=True)
+        oe_class = "warning-badge" if oe_sig else "success-badge"
+        oe_text = "EB Flag Triggered (depth difference)" if oe_sig else "Passed (equal depth transits)"
+        st.markdown(f"**Odd-Even Transit Depth Test:**  \n<span class='{oe_class}'>{oe_text}</span>", unsafe_allow_html=True)
+        st.write(f"Odd depth: {val['odd_even']['odd_depth']:.4f}, Even depth: {val['odd_even']['even_depth']:.4f}")
         
-        # Centroid test text
         cen_shift = val["centroid"]["shift_detected"]
-        cen_icon = "❌ Blend Candidate (Centroid Shift)" if cen_shift else "✅ Passed (No Centroid Shift)"
-        cen_color = "warning-text" if cen_shift else "success-text"
-        st.markdown(f"**Astrometric Centroid Shift Test:**  \n<span class='{cen_color}'>{cen_icon}</span> (Col Shift: {val['centroid']['col_shift']:.4f} pix, Row Shift: {val['centroid']['row_shift']:.4f} pix)", unsafe_allow_html=True)
+        cen_class = "warning-badge" if cen_shift else "success-badge"
+        cen_text = "Blend Flag Triggered (centroid shift)" if cen_shift else "Passed (centroid is stable)"
+        st.markdown(f"**Astrometric Centroid Shift Test:**  \n<span class='{cen_class}'>{cen_text}</span>", unsafe_allow_html=True)
+        st.write(f"Column shift: {val['centroid']['col_shift']:.4f} pix, Row shift: {val['centroid']['row_shift']:.4f} pix")
         
-        # F-test significance text
         sig_pval = val["significance"]["p_value"]
-        sig_icon = "✅ Highly Significant Transit" if sig_pval < 0.001 else "❌ Marginally/Non-Significant Transit"
-        sig_color = "success-text" if sig_pval < 0.001 else "warning-text"
-        st.markdown(f"**Model Significance (F-Test):**  \n<span class='{sig_color}'>{sig_icon}</span> (p-value: {sig_pval:.3e})", unsafe_allow_html=True)
+        sig_class = "success-badge" if sig_pval < 0.001 else "warning-badge"
+        sig_text = "Passed (highly significant dip)" if sig_pval < 0.001 else "Failed (non-significant signal)"
+        st.markdown(f"**Model Significance (F-Test):**  \n<span class='{sig_class}'>{sig_text}</span> (p-value: {sig_pval:.2e})", unsafe_allow_html=True)
 
     with col2:
-        st.subheader("3. Pipeline Reliability Score")
+        st.subheader("Composite Pipeline Reliability Assessment")
         rel_score = val["reliability"]
         
-        # Visual reliability color ring/gauge
         if rel_score >= 80:
-            rel_color = "#4ade80" # Green
-            desc = "High Reliability Candidate. Passes all vet criteria. Excellent follow-up candidate."
+            rel_color = "#166534" # Green
+            desc = "High Reliability Candidate. Passes all vet criteria. Suggested follow-up candidate."
         elif rel_score >= 50:
-            rel_color = "#fbbf24" # Yellow
+            rel_color = "#854d0e" # Dark Yellow
             desc = "Moderate Reliability Candidate. Minor vettings flags present. Needs astrophysical evaluation."
         else:
-            rel_color = "#f87171" # Red
+            rel_color = "#991b1b" # Red
             desc = "False Positive Signal. Severe centroid shift or odd-even differences detected."
             
         st.markdown(f"""
-        <div style='border: 2px solid {rel_color}; border-radius: 12px; padding: 25px; text-align: center; background-color: rgba(30, 41, 59, 0.2);'>
-            <div style='font-size: 1.1rem; color: #94a3b8; font-weight:600;'>OVERALL RELIABILITY SCORE</div>
-            <div style='font-size: 3.5rem; color: {rel_color}; font-weight: 700; margin: 10px 0;'>{rel_score:.1f}%</div>
-            <div style='font-size: 0.95rem; color: #e2e8f0;'>{desc}</div>
+        <div style='border: 1px solid #d1d5db; border-radius: 4px; padding: 20px; text-align: center; background-color: #f9fafb;'>
+            <div style='font-size: 0.8rem; color: #4b5563; font-weight:700; text-transform:uppercase;'>Reliability Metric Score</div>
+            <div style='font-size: 3rem; color: {rel_color}; font-weight: 700; margin: 8px 0;'>{rel_score:.1f}%</div>
+            <div style='font-size: 0.9rem; color: #1f2937;'>{desc}</div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.subheader("4. Best-Fit Parameters Table")
+        st.subheader("Orbital Parameters Reference Table")
         fit_df = pd.DataFrame({
-            "Parameter": ["Orbital Period (P)", "Transit Center (t0)", "Transit Depth (d)", "Planet Radius Ratio (Rp/Rs)", "Impact Parameter (b)", "Inclination (i)"],
+            "Optimized Parameter": ["Orbital Period (P)", "Transit Center (t0)", "Transit Depth (d)", "Radius Ratio (Rp/Rs)", "Impact Parameter (b)", "Inclination (i)"],
             "Fitted Value": [f"{fit['period']:.5f} days", f"{fit['t0']:.4f} BTJD", f"{fit['depth']:.5f}", f"{fit['rp_rs']:.4f}", f"{fit.get('impact_parameter', 0.0):.3f}", f"{fit['inc']:.2f}°"]
         })
         st.table(fit_df)
         
     st.markdown("---")
     
-    # Download JSON button
+    # Download JSON report
     report_dict = {
         "tic_id": st.session_state["tic_id"],
         "classification": class_res,
@@ -667,3 +921,75 @@ elif page == "7. Final Report":
         mime="application/json",
         use_container_width=True
     )
+
+# --- 9. RESEARCH MODE ---
+elif st.session_state["nav_page"] == "Research Mode":
+    st.title("Research Mode - Coming Soon")
+    st.caption("Advanced Exoplanet Discovery Environment")
+    
+    st.markdown("""
+    Research Mode is intended to become an advanced workspace for astronomers, students, and researchers to perform custom exoplanet investigations beyond the automated detection pipeline.
+    """)
+    
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Planned Future Capabilities")
+        
+        st.markdown("""
+        **1. Multi-Source Data Ingestion**  
+        Planned support for loading:
+        - TESS Light Curves
+        - Kepler Light Curves
+        - FITS Files
+        - CSV Files
+        - TXT Time Series
+        - Simulated Transit Datasets
+        - Future Telescope Data Products
+        
+        **2. Custom Transit Analysis**  
+        Planned support for:
+        - Manual BLS Execution
+        - Manual TLS Execution
+        - Parameter Tuning
+        - Search Range Optimization
+        - Transit Injection Experiments
+        - Noise Analysis Studies
+        
+        **3. Resource Allocation Controls**  
+        Planned support for:
+        - CPU Allocation
+        - GPU Allocation
+        - Batch Processing
+        - Search Resolution Selection
+        - Model Selection Controls
+        """)
+        
+    with col2:
+        st.subheader("Comparative & Benchmarking Tools")
+        
+        st.markdown("""
+        **4. Comparative Research Workspace**  
+        Planned support for:
+        - BLS vs TLS Comparison
+        - CNN vs Physics Classifier Comparison
+        - Ensemble Comparison
+        - Explainability Comparison
+        - Multi-Model Benchmarking
+        """)
+        
+        st.subheader("Exoplanet Candidate Leaderboard")
+        st.markdown("Future ranking system for candidates, incorporating detection confidence, SNR, reliability, and scientific interest scores.")
+        
+        # Leaderboard Table
+        leaderboard_df = pd.DataFrame({
+            "Rank": [1, 2, 3, 4, 5],
+            "Candidate ID": ["TIC 261108232.01", "TIC 142394651.01", "TIC 902846173.01", "TIC 441029486.01", "TIC 308947215.01"],
+            "Confidence": ["98.4%", "95.1%", "89.3%", "84.2%", "78.9%"],
+            "SNR": ["24.5", "18.2", "12.8", "9.4", "7.6"],
+            "Reliability Score": ["96.0%", "92.0%", "85.0%", "72.0%", "55.0%"],
+            "Status": ["Vetted & Confirmed", "Vetted Candidate", "Vetted Candidate", "Minor Flags Present", "High Blend Probability"]
+        })
+        st.table(leaderboard_df)

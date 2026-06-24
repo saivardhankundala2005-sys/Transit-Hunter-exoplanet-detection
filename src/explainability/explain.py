@@ -209,6 +209,10 @@ class ExplainabilityEngine:
         ax.set_title('Explainable AI: CNN Grad-CAM Attribution Map')
         ax.legend(loc='best')
         ax.grid(True, alpha=0.3)
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+            spine.set_color('#cbd5e1')
+            spine.set_linewidth(1.0)
         
         plt.tight_layout()
         if save_path:
@@ -241,6 +245,10 @@ class ExplainabilityEngine:
         
         # Add centerline
         ax.axvline(0, color='gray', linestyle='--', linewidth=0.8)
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+            spine.set_color('#cbd5e1')
+            spine.set_linewidth(1.0)
         
         plt.tight_layout()
         if save_path:
